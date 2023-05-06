@@ -1,6 +1,8 @@
 import { useState } from "react";
 import server from "./server";
 
+import { signMessage, ACCOUNTS_ADDRESS } from './utils';
+
 function Transfer({ address, setBalance }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
@@ -10,14 +12,45 @@ function Transfer({ address, setBalance }) {
   async function transfer(evt) {
     evt.preventDefault();
 
+    if (!address) {
+      alert("Please select an address");
+      return;
+    }
+
+    if (!recipient) {
+      alert("Please select a recipient");
+      return;
+    }
+
+    if (!sendAmount || isNaN(sendAmount) || sendAmount <= 0) {
+      alert("Please enter a valid amount");
+      return;
+    }
+
+    if (address === recipient) {
+      alert("You cannot send to yourself");
+      return;
+    }
+
+    const message = {
+      amount: parseInt(sendAmount),
+      recipient,
+      address
+    }
+
+    const signature = await signMessage(address, message);
+
+    const transaction = {
+      message,
+      signature,
+    };
+    
+    console.log("🚀 ~ file: Transfer.jsx:43 ~ transfer ~ transaction:", transaction)
+
     try {
       const {
         data: { balance },
-      } = await server.post(`send`, {
-        sender: address,
-        amount: parseInt(sendAmount),
-        recipient,
-      });
+      } = await server.post(`send`, transaction);
       setBalance(balance);
     } catch (ex) {
       alert(ex.response.data.message);
@@ -39,11 +72,14 @@ function Transfer({ address, setBalance }) {
 
       <label>
         Recipient
-        <input
-          placeholder="Type an address, for example: 0x2"
-          value={recipient}
-          onChange={setValue(setRecipient)}
-        ></input>
+        <select onChange={setValue(setRecipient)} value={recipient}>
+          <option value="">Select Recipient</option>
+          {ACCOUNTS_ADDRESS.map((a, i) => (
+            <option key={i} value={a}>
+              {a.slice(0, 12) + '...' + a.slice(-4)}
+            </option>
+          ))}
+        </select>
       </label>
 
       <input type="submit" className="button" value="Transfer" />
